@@ -1,0 +1,6 @@
+"0","corte <- ""2021-06-07  04:00:00"""
+"0","muestra2018 <- read_csv(""datos/muestra2018.csv"", "
+"0","    col_types = cols(hora_captura = col_datetime(format = ""%d/%m/%Y %H:%M"")), locale = locale(encoding = ""ISO-8859-1"")) %>% clean_names()"
+"0","muestra_distritos <- read_csv(""datos/muestra.distritos.csv"", "
+"0","    col_types = cols(X1 = col_skip()), locale = locale(encoding = ""ISO-8859-1"")) %>% clean_names()"
+"2","Missing column names filled in: 'X1' [1]"

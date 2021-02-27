@@ -1,0 +1,73 @@
+library(tidyverse)
+library(extrafont)
+library(scales)
+library(plotly)
+library(htmlwidgets)
+library(showtext)
+library(tint)
+library(rgdal)
+library(rgeos)
+library(miniUI)
+library(zoo)
+library(leaflet)
+library("Cairo")
+library(htmltools)
+distritosvotos <- read_csv("data/distritosvotos.csv",locale = locale(encoding = "ISO-8859-1"))
+
+distritosvotos <- distritosvotos %>% mutate (PRI=round(pri*100/votacion,1), PAN=round(pan*100/votacion,1), muestra=casillas_llegada*100/casillas_muestra)
+
+distritosvotos <- distritosvotos %>% mutate(muestraclasf=if_else(muestra>90,5, 
+                                        if_else(muestra>75,4, if_else(muestra>50,3, if_else(muestra>25,2,1)))))
+
+capa_distritos <- readOGR("Shapes", layer="Distritos",  encoding = "UTF-8", use_iconv=TRUE)
+
+capa_distritos <- capa_distritos %>%  merge(distritosvotos)
+
+incipal <-  colorFactor(c("#58BCBC", "#01A2AC", "#01787E", "#005155", "black"), levels= c("1","2","3","4","5"), na.color ="#e8e6e6")
+
+labs <- c("0% - 25%","25% - 50%", "50% - 75%", "75% - 90%" , "90%-100%")
+
+popup <- paste0(
+  "<b>", as.character(capa_distritos$dist_name), "</b>",     "<br>",
+  "<b>", "% Casillas capturadas:   ", "</b>",   as.character(capa_distritos$muestra),      "<br>",
+  "<b>", "Votación total:   ",           "</b>",   as.character(capa_distritos$votacion),      "<br>",
+  "<b>", "% PRI:   ",           "</b>",   as.character(capa_distritos$PRI),      "<br>",
+  "<b>", "%PAN :   ",           "</b>",   as.character(capa_distritos$PAN),      "<br>")  %>% lapply(htmltools::HTML)
+
+
+
+
+mapadistritos <- leaflet(capa_distritos) %>% 
+  addProviderTiles(providers$CartoDB.Voyager) %>%
+  addLayersControl( 
+    baseGroups = c("% CAPTURA DE MUESTRA"), 
+    options = layersControlOptions(collapsed = FALSE, position = "topleft")) %>% 
+  addPolygons(data= capa_distritos,
+              stroke= TRUE,
+              weight=0.2,                   
+              opacity=1,
+              fillColor = ~incipal(capa_distritos$muestraclasf),
+              color= "white",
+              fillOpacity = 1,
+              smoothFactor = 0.5,
+              highlightOptions = highlightOptions(color = "black", 
+                                                  weight = 1.2,
+                                                  bringToFront = TRUE),
+              label=popup, 
+              labelOptions = labelOptions(noHide = F, direction = "top",
+                                          style = list(
+                                            "color" = "black",
+                                            "font-family" = "Lato",
+                                            "font-style" = "regular",
+                                            "box-shadow" = "2px 2px rgba(0,0,0,0.25)",
+                                            "font-size" = "11px",
+                                            "border-color" = "rgba(0,0,0,0.5)"
+                                          )),
+              group= "% CAPTURA DE MUESTRA") %>%
+  addLegend(position = "topleft", pal = incipal, values = ~capa_distritos$muestraclasf, opacity=1, group= "% CAPTURA DE MUESTRA", 
+            labFormat = function(type, cuts, p) {  
+              paste0(labs)} ,
+            title = NULL, na.label = "N/A") 
+
+saveWidget(mapadistritos,"distritos.html", selfcontained = F, libdir = "lib")
+
