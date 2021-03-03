@@ -1,6 +1,6 @@
 ---
 title: "CONTEO RÁPIDO: GOBERNADOR 2021-2028"
-output: 
+output:
   flexdashboard::flex_dashboard:
     navbar:
       - { title: "2021-06-07 08:00:00", align: right }
@@ -17,6 +17,7 @@ library(tidyverse)
 library(scales)
 library(plotly)
 library(htmlwidgets)
+library(shinyWidgets)
 library(tint)
 library(rgdal)
 library(rgeos)
@@ -31,13 +32,7 @@ library(rcartocolor)
 library(janitor)
 ```
 
-```{r, include=FALSE}
-corte <- "2021-06-07  04:00:00"
-muestra2018 <- read_csv("datos/muestra2018.csv", 
-    col_types = cols(hora_captura = col_datetime(format = "%d/%m/%Y %H:%M")), locale = locale(encoding = "ISO-8859-1")) %>% clean_names()
-muestra_distritos <- read_csv("datos/muestra.distritos.csv", 
-    col_types = cols(X1 = col_skip()), locale = locale(encoding = "ISO-8859-1")) %>% clean_names()
-
+```{r global, include=FALSE}
 
 ```
 Resultados al corte
@@ -47,57 +42,80 @@ Column {.sidebar}
 -----------------------------------------------------------------------
 Simulación de espacios de 30 minutos.
 ```{r}
-sliderInput("hour_lapse", label = "Índice de hora",
-            min = 1, max = 10, value = 1, step = 1)
 
-cortemuestra <- reactive({muestra2018 %>% filter(hora_captura<as_datetime(input$hour_lapse)) %>% count(distrito_local, distrito_l, prianrd, morena, votacion_total_emitida, votos_nulos, lista_nominal, hora_captura, seccion_casilla)})
-avancedistritos <- cortemuestra %>%
-  group_by(distrito_local, distrito_l) %>%
-  summarize(morena=sum(morena),
-            prianrd=sum(prianrd),
-            votacion_emitida=sum(votacion_total_emitida),
-            votos_nulos=sum(votos_nulos),
-            lista_nominal=sum(lista_nominal),
-            avancecasillas=sum(n)) %>%
-  rename(DISTRITO_L=distrito_l)
-avancedistritos <- avancedistritos %>% left_join(muestra_distritos)
+      sliderTextInput("HourLapse",
+                  "Interval:",
+                  choices=sort(unique(c("2021-06-06 20:00:00",
+                                        "2021-06-06 20:30:00",
+                                        "2021-06-06 21:00:00",
+                                        "2021-06-06 21:30:00",
+                                        "2021-06-06 22:00:00",
+                                        "2021-06-06 22:30:00",
+                                        "2021-06-06 23:00:00",
+                                        "2021-06-06 23:30:00",
+                                        "2021-06-07 00:00:00",
+                                        "2021-06-07 00:30:00",
+                                        "2021-06-07 01:00:00",
+                                        "2021-06-07 01:30:00",
+                                        "2021-06-07 02:00:00",
+                                        "2021-06-07 02:30:00",
+                                        "2021-06-07 03:00:00",
+                                        "2021-06-07 03:00:00",
+                                        "2021-06-07 04:30:00",
+                                        "2021-06-07 04:00:00",
+                                        "2021-06-07 05:30:00",
+                                        "2021-06-07 06:00:00",
+                                        "2021-06-07 06:30:00"))),
+                  select="2021-06-06 21:00:00")
 
-avancedistritos <- avancedistritos %>% mutate(pprianrd=round(prianrd/votacion_emitida,3),
-                                          pmorena=round(morena/votacion_emitida,3),
-                                          pnulos=round(votos_nulos/votacion_emitida,3),
-                                          participacion =round(votacion_emitida/lista_nominal,3),
-                                          avance= round(avancecasillas/casillas,3))
+avanceestatal_reactive <- reactive({
+
+  muestra2018 <- read_csv("datos/muestra2018.csv",
+                          col_types = cols(hora_captura = col_datetime(format = "%d/%m/%Y %H:%M")), locale = locale(encoding = "ISO-8859-1")) %>% clean_names()
+  muestra_distritos <- read_csv("datos/muestra.distritos.csv",
+                                col_types = cols(X1 = col_skip()), locale = locale(encoding = "ISO-8859-1")) %>% clean_names()
 
 
+  cortemuestra <- muestra2018 %>%
+    filter(hora_captura < as_datetime(input$HourLapse)) %>%
+    count(distrito_local, distrito_l, prianrd, morena, votacion_total_emitida, votos_nulos, lista_nominal, hora_captura, seccion_casilla)
+  avancedistritos <- cortemuestra %>%
+    group_by(distrito_local, distrito_l) %>%
+    summarize(morena = sum(morena),
+              prianrd = sum(prianrd),
+              votacion_emitida = sum(votacion_total_emitida),
+              votos_nulos = sum(votos_nulos),
+              lista_nominal = sum(lista_nominal),
+              avancecasillas = sum(n)) %>%
+    rename(DISTRITO_L = distrito_l)
+  avancedistritos <- avancedistritos %>% left_join(muestra_distritos)
+
+  avancedistritos <- avancedistritos %>% mutate(pprianrd = round(prianrd / votacion_emitida, 3),
+                                                pmorena = round(morena / votacion_emitida, 3),
+                                                pnulos = round(votos_nulos / votacion_emitida, 3),
+                                                participacion = round(votacion_emitida / lista_nominal, 3),
+                                                avance = round(avancecasillas / casillas, 3))
 
 
-
-avanceestatal <- avancedistritos %>% ungroup() %>%
-  summarize(morena=sum(morena),
-            prianrd=sum(prianrd),
-            votacion_emitida=sum(votacion_emitida),
-            votos_nulos=sum(votos_nulos),
-            lista_nominal=sum(lista_nominal),
-            avancecasillas=sum(avancecasillas),
-            casillas=sum(casillas))
-avanceestatal <- avanceestatal %>% mutate(pprianrd=round(prianrd/votacion_emitida,3),
-                                          pmorena=round(morena/votacion_emitida,3),
-                                          pnulos=round(votos_nulos/votacion_emitida,3),
-                                          participacion =round(votacion_emitida/lista_nominal,3),
-                                          avance= round(avancecasillas/casillas,3))
+  avanceestatal <- avancedistritos %>%
+    ungroup() %>%
+    summarize(morena = sum(morena),
+              prianrd = sum(prianrd),
+              votacion_emitida = sum(votacion_emitida),
+              votos_nulos = sum(votos_nulos),
+              lista_nominal = sum(lista_nominal),
+              avancecasillas = sum(avancecasillas),
+              casillas = sum(casillas))
+  avanceestatal <- avanceestatal %>% mutate(pprianrd = round(prianrd / votacion_emitida, 3),
+                                            pmorena = round(morena / votacion_emitida, 3),
+                                            pnulos = round(votos_nulos / votacion_emitida, 3),
+                                            participacion = round(votacion_emitida / lista_nominal, 3),
+                                            avance = round(avancecasillas / casillas, 3))
+})
 ```
 
 Column {data-width=100}
 -----------------------------------------------------------------------
-
-
-```{r, include=FALSE}
-Tendencia <- "No"
-Avance <- avanceestatal$avance
-Participacion <- avanceestatal$participacion
-Nulos <- avanceestatal$pnulos
-Cobertura <- 1
-```
 
 ### **Tendencia**
 
@@ -108,17 +126,23 @@ valueBox("No definitiva")
 ### **Avance de captura**
 
 ```{r}
-valueBox(percent(avanceestatal$avance))
+renderValueBox({
+  percent(avanceestatal_reactive()$avance)
+})
 ```
 
 ### **Participación ciudadana**
 ```{r}
-valueBox(percent(avanceestatal$participacion))
+renderValueBox({
+  percent(avanceestatal_reactive()$participacion)
+})
 ```
 
 ### **Votos nulos**
 ```{r}
-valueBox(percent(avanceestatal$pnulos))
+renderValueBox({
+  percent(avanceestatal_reactive()$pnulos)
+})
 ```
 
 Column {data-width=400}
@@ -127,7 +151,8 @@ Column {data-width=400}
 ### Resultado proyectado
 
 ```{r}
-Resultado <- ggplot(avanceestatal) +
+renderPlot({
+  ggplot(avanceestatal_reactive()) +
   geom_col(aes(x= pprianrd, y= "PRIANRD", fill= "PRIANRD"), color="black", alpha=0.8, linetype= "solid", width = 0.5)+
   geom_col(aes(x= pmorena, y = "MORENA", fill= "MORENA"), color="black", alpha=0.8, linetype= "solid", width = 0.5)+
   geom_text(aes(x= pprianrd, y= "PRIANRD", label=percent(pprianrd)), fontface="bold", color= "white", size=8, hjust = 1) +
@@ -135,23 +160,32 @@ Resultado <- ggplot(avanceestatal) +
   scale_fill_manual(name= "", values= c("PRIANRD"="#287D77", "MORENA"="#611935")) +
          theme_void() +
         theme(legend.position = "none", axis.text.y = element_text(face="bold", size = 15))
-```
-
-```{r}
-Resultado
+})
 ```
 
 
 ### Tendencias
 
-```{r,  include=FALSE}
-tendencia <- cortemuestra %>% select(hora_captura,prianrd, morena, votacion_total_emitida ) %>%
+```{r}
+tendencia <- reactive({
+    muestra2018 <- read_csv("datos/muestra2018.csv",
+                          col_types = cols(hora_captura = col_datetime(format = "%d/%m/%Y %H:%M")), locale = locale(encoding = "ISO-8859-1")) %>% clean_names()
+  muestra_distritos <- read_csv("datos/muestra.distritos.csv",
+                                col_types = cols(X1 = col_skip()), locale = locale(encoding = "ISO-8859-1")) %>% clean_names()
+
+  cortemuestra <- muestra2018 %>%
+    filter(hora_captura < as_datetime(input$HourLapse)) %>%
+    count(distrito_local, distrito_l, prianrd, morena, votacion_total_emitida, votos_nulos, lista_nominal, hora_captura, seccion_casilla)
+
+  cortemuestra %>% select(hora_captura,prianrd, morena, votacion_total_emitida ) %>%
   arrange(hora_captura) %>%
   mutate(PRIANRD=cumsum(prianrd),
          MORENA=cumsum(morena),
          VOTOS=cumsum(votacion_total_emitida))
+})
 
-Tendencia <- ggplot(tendencia, aes(x= as_datetime(hora_captura))) +
+renderPlot({
+  ggplot(tendencia(), aes(x= as_datetime(hora_captura))) +
   geom_line(aes(y= (PRIANRD*100/VOTOS), color= "PRIANRD"),linetype= "solid", size=1.5, arrow=arrow(type="open", length=unit(0.2,"cm")))+
   geom_line(aes(y= (MORENA*100/VOTOS), color= "MORENA"), linetype= "solid", size=1.5,arrow=arrow(type="open", length=unit(0.2,"cm")))+
   scale_color_manual(name= "", values= c("PRIANRD"="#287D77", "MORENA"="#611935")) +
@@ -159,76 +193,7 @@ Tendencia <- ggplot(tendencia, aes(x= as_datetime(hora_captura))) +
        theme_light() +
         theme(legend.position = c(0.9,0.9), legend.background = element_rect(fill="transparent"), axis.title = element_text(face="bold", size = 15)) +
   labs(y= "% de votos", x= "Corte")
-```
-
-```{r}
-Tendencia
-```
-
-Column {data-width=500}
------------------------------------------------------------------------
-
-### Avance distrital
-
-```{r , include=FALSE}
-capa_distritos <- readOGR("Shapes", layer="Distritos",  encoding = "UTF-8", use_iconv=TRUE)
-
-avancedistritos <- avancedistritos %>% mutate(muestraclasf=if_else(avance>0.90,1,
-                                        if_else(avance>0.75,2,
-                                                if_else(avance>0.50,3,
-                                                        if_else(avance>0.25,4,5)))))
-
-
-capa_distritos <- capa_distritos %>%  merge(avancedistritos)
-
-incipal <-  colorFactor(c("#1A4450","#276678", "#3488A0", "#78BFD3","#D2EAF0"), levels= c("1","2","3","4","5"), na.color ="#e8e6e6")
-
-labs <- c( "90%-100%", "75% - 90%", "50% - 75%" , "25% - 50%", "0% - 25%" )
-niveles<- c("5","4","3","2","1")
-
-popup <- paste0(
-  "<b>", as.character(capa_distritos$distrito_local), "</b>",     "<br>",
-  "<b>", "% Casillas capturadas:   ", "</b>",   as.character(capa_distritos$avance*100), "%",     "<br>",
-  "<b>", "Votación total:   ",           "</b>",   as.character(capa_distritos$votacion_emitida),     "<br>",
-  "<b>", "% Participación:   ",           "</b>",   as.character(capa_distritos$participacion*100), "%",     "<br>",
-    "<b>", "% PRIANRD :   ",           "</b>",   as.character(capa_distritos$pprianrd*100),  "%",    "<br>",
-  "<b>", "% MORENA:   ",           "</b>",   as.character(capa_distritos$pmorena*100),   "%",   "<br>")  %>% lapply(htmltools::HTML)
-
-
-
-
-mapadistritos <- leaflet(capa_distritos) %>%
-  addProviderTiles(providers$CartoDB.PositronNoLabels) %>%
-  addLayersControl(
-    baseGroups = c("% CAPTURA DE MUESTRA"),
-    options = layersControlOptions(collapsed = FALSE, position = "topleft")) %>%
-  addPolygons(data= capa_distritos,
-              stroke= TRUE,
-              weight=0.2,
-              opacity=1,
-              fillColor = ~incipal(capa_distritos$muestraclasf),
-              color= "white",
-              fillOpacity = 1,
-              smoothFactor = 0.5,
-              highlightOptions = highlightOptions(color = "black",
-                                                  weight = 1.2,
-                                                  bringToFront = TRUE),
-              label=popup,
-              labelOptions = labelOptions(noHide = F, direction = "top",
-                                          style = list(
-                                            "color" = "black",
-                                            "font-family" = "Lato",
-                                            "font-style" = "regular",
-                                            "box-shadow" = "2px 2px rgba(0,0,0,0.25)",
-                                            "font-size" = "11px",
-                                            "border-color" = "rgba(0,0,0,0.5)"
-                                          )),
-              group= "% CAPTURA DE MUESTRA") %>%
-  addLegend(position = "topleft", pal = incipal, values = ~niveles, opacity=1, group= "% CAPTURA DE MUESTRA",
-            labFormat = function(type, cuts, p) {
-              paste0(labs)} ,
-            title = NULL, na.label = "N/A")
-
+})
 ```
 
 ```{r}
