@@ -7,8 +7,8 @@ output:
     theme: lumen
     orientation: columns
     vertical_layout: fill
+runtime: shiny
 ---
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(dev = "png", dev.args = list(type = "cairo-png"))
 
@@ -29,8 +29,6 @@ library(leaflet)
 library(htmltools)
 library(rcartocolor)
 library(janitor)
-
-
 ```
 
 ```{r, include=FALSE}
@@ -42,59 +40,63 @@ muestra_distritos <- read_csv("datos/muestra.distritos.csv",
 
 
 ```
+Resultados al corte
+=====================================
 
-```{r, include=FALSE}
-cortemuestra <- muestra2018 %>% filter(hora_captura<as_datetime(corte)) %>% count(distrito_local, distrito_l, prianrd, morena, votacion_total_emitida, votos_nulos, lista_nominal, hora_captura, seccion_casilla)
-avancedistritos <- cortemuestra %>% 
-  group_by(distrito_local, distrito_l) %>% 
-  summarize(morena=sum(morena), 
-            prianrd=sum(prianrd), 
+Column {.sidebar}
+-----------------------------------------------------------------------
+Simulación de espacios de 30 minutos.
+```{r}
+sliderInput("hour_lapse", label = "Índice de hora",
+            min = 1, max = 10, value = 1, step = 1)
+
+cortemuestra <- reactive({muestra2018 %>% filter(hora_captura<as_datetime(input$hour_lapse)) %>% count(distrito_local, distrito_l, prianrd, morena, votacion_total_emitida, votos_nulos, lista_nominal, hora_captura, seccion_casilla)})
+avancedistritos <- cortemuestra %>%
+  group_by(distrito_local, distrito_l) %>%
+  summarize(morena=sum(morena),
+            prianrd=sum(prianrd),
             votacion_emitida=sum(votacion_total_emitida),
             votos_nulos=sum(votos_nulos),
             lista_nominal=sum(lista_nominal),
-            avancecasillas=sum(n)) %>% 
+            avancecasillas=sum(n)) %>%
   rename(DISTRITO_L=distrito_l)
 avancedistritos <- avancedistritos %>% left_join(muestra_distritos)
 
-avancedistritos <- avancedistritos %>% mutate(pprianrd=round(prianrd/votacion_emitida,3), 
-                                          pmorena=round(morena/votacion_emitida,3), 
-                                          pnulos=round(votos_nulos/votacion_emitida,3), 
-                                          participacion =round(votacion_emitida/lista_nominal,3), 
+avancedistritos <- avancedistritos %>% mutate(pprianrd=round(prianrd/votacion_emitida,3),
+                                          pmorena=round(morena/votacion_emitida,3),
+                                          pnulos=round(votos_nulos/votacion_emitida,3),
+                                          participacion =round(votacion_emitida/lista_nominal,3),
                                           avance= round(avancecasillas/casillas,3))
 
 
 
 
 
-avanceestatal <- avancedistritos %>% ungroup() %>% 
-  summarize(morena=sum(morena), 
-            prianrd=sum(prianrd), 
+avanceestatal <- avancedistritos %>% ungroup() %>%
+  summarize(morena=sum(morena),
+            prianrd=sum(prianrd),
             votacion_emitida=sum(votacion_emitida),
             votos_nulos=sum(votos_nulos),
             lista_nominal=sum(lista_nominal),
             avancecasillas=sum(avancecasillas),
             casillas=sum(casillas))
-avanceestatal <- avanceestatal %>% mutate(pprianrd=round(prianrd/votacion_emitida,3), 
-                                          pmorena=round(morena/votacion_emitida,3), 
-                                          pnulos=round(votos_nulos/votacion_emitida,3), 
-                                          participacion =round(votacion_emitida/lista_nominal,3), 
+avanceestatal <- avanceestatal %>% mutate(pprianrd=round(prianrd/votacion_emitida,3),
+                                          pmorena=round(morena/votacion_emitida,3),
+                                          pnulos=round(votos_nulos/votacion_emitida,3),
+                                          participacion =round(votacion_emitida/lista_nominal,3),
                                           avance= round(avancecasillas/casillas,3))
 ```
-
-Resultados al corte
-=====================================
-
 
 Column {data-width=100}
 -----------------------------------------------------------------------
 
 
 ```{r, include=FALSE}
-Tendencia = function(...) return("No")
-Avance = function(...) return(avanceestatal$avance)
-Participacion = function(...) return(avanceestatal$participacion)
-Nulos = function(...) return(avanceestatal$pnulos)
-Cobertura= function(...) return(1)
+Tendencia <- "No"
+Avance <- avanceestatal$avance
+Participacion <- avanceestatal$participacion
+Nulos <- avanceestatal$pnulos
+Cobertura <- 1
 ```
 
 ### **Tendencia**
@@ -143,10 +145,10 @@ Resultado
 ### Tendencias
 
 ```{r,  include=FALSE}
-tendencia <- cortemuestra %>% select(hora_captura,prianrd, morena, votacion_total_emitida ) %>% 
-  arrange(hora_captura) %>% 
-  mutate(PRIANRD=cumsum(prianrd), 
-         MORENA=cumsum(morena), 
+tendencia <- cortemuestra %>% select(hora_captura,prianrd, morena, votacion_total_emitida ) %>%
+  arrange(hora_captura) %>%
+  mutate(PRIANRD=cumsum(prianrd),
+         MORENA=cumsum(morena),
          VOTOS=cumsum(votacion_total_emitida))
 
 Tendencia <- ggplot(tendencia, aes(x= as_datetime(hora_captura))) +
@@ -171,9 +173,9 @@ Column {data-width=500}
 ```{r , include=FALSE}
 capa_distritos <- readOGR("Shapes", layer="Distritos",  encoding = "UTF-8", use_iconv=TRUE)
 
-avancedistritos <- avancedistritos %>% mutate(muestraclasf=if_else(avance>0.90,1, 
-                                        if_else(avance>0.75,2, 
-                                                if_else(avance>0.50,3, 
+avancedistritos <- avancedistritos %>% mutate(muestraclasf=if_else(avance>0.90,1,
+                                        if_else(avance>0.75,2,
+                                                if_else(avance>0.50,3,
                                                         if_else(avance>0.25,4,5)))))
 
 
@@ -195,23 +197,23 @@ popup <- paste0(
 
 
 
-mapadistritos <- leaflet(capa_distritos) %>% 
+mapadistritos <- leaflet(capa_distritos) %>%
   addProviderTiles(providers$CartoDB.PositronNoLabels) %>%
-  addLayersControl( 
-    baseGroups = c("% CAPTURA DE MUESTRA"), 
-    options = layersControlOptions(collapsed = FALSE, position = "topleft")) %>% 
+  addLayersControl(
+    baseGroups = c("% CAPTURA DE MUESTRA"),
+    options = layersControlOptions(collapsed = FALSE, position = "topleft")) %>%
   addPolygons(data= capa_distritos,
               stroke= TRUE,
-              weight=0.2,                   
+              weight=0.2,
               opacity=1,
               fillColor = ~incipal(capa_distritos$muestraclasf),
               color= "white",
               fillOpacity = 1,
               smoothFactor = 0.5,
-              highlightOptions = highlightOptions(color = "black", 
+              highlightOptions = highlightOptions(color = "black",
                                                   weight = 1.2,
                                                   bringToFront = TRUE),
-              label=popup, 
+              label=popup,
               labelOptions = labelOptions(noHide = F, direction = "top",
                                           style = list(
                                             "color" = "black",
@@ -222,15 +224,15 @@ mapadistritos <- leaflet(capa_distritos) %>%
                                             "border-color" = "rgba(0,0,0,0.5)"
                                           )),
               group= "% CAPTURA DE MUESTRA") %>%
-  addLegend(position = "topleft", pal = incipal, values = ~niveles, opacity=1, group= "% CAPTURA DE MUESTRA", 
-            labFormat = function(type, cuts, p) {  
+  addLegend(position = "topleft", pal = incipal, values = ~niveles, opacity=1, group= "% CAPTURA DE MUESTRA",
+            labFormat = function(type, cuts, p) {
               paste0(labs)} ,
-            title = NULL, na.label = "N/A") 
+            title = NULL, na.label = "N/A")
 
 ```
 
 ```{r}
-mapadistritos
+renderLeaflet(mapadistritos)
 ```
 
 Información por casilla
@@ -247,7 +249,7 @@ reactable(CDSELECT, searchable = TRUE, highlight = TRUE, defaultSorted = "votaci
     noData = "No encontrado",
     pageInfo = "{rowStart} a {rowEnd} de {rows} entradas",
     pagePrevious = "Previa",
-    pageNext = "Siguiente"), 
+    pageNext = "Siguiente"),
     theme = reactableTheme(
       headerStyle = list(
         "&:hover[aria-sort]" = list(background = "hsl(0, 0%, 96%)"),
