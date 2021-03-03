@@ -1,0 +1,93 @@
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### Avance distrital
+
+```{r , include=FALSE}
+capa_distritos <- readOGR("Shapes", layer="Distritos",  encoding = "UTF-8", use_iconv=TRUE)
+
+avancedistritos <- avancedistritos %>% mutate(muestraclasf=if_else(avance>0.90,1,
+                                        if_else(avance>0.75,2,
+                                                if_else(avance>0.50,3,
+                                                        if_else(avance>0.25,4,5)))))
+
+
+capa_distritos <- capa_distritos %>%  merge(avancedistritos)
+
+incipal <-  colorFactor(c("#1A4450","#276678", "#3488A0", "#78BFD3","#D2EAF0"), levels= c("1","2","3","4","5"), na.color ="#e8e6e6")
+
+labs <- c( "90%-100%", "75% - 90%", "50% - 75%" , "25% - 50%", "0% - 25%" )
+niveles<- c("5","4","3","2","1")
+
+popup <- paste0(
+  "<b>", as.character(capa_distritos$distrito_local), "</b>",     "<br>",
+  "<b>", "% Casillas capturadas:   ", "</b>",   as.character(capa_distritos$avance*100), "%",     "<br>",
+  "<b>", "Votación total:   ",           "</b>",   as.character(capa_distritos$votacion_emitida),     "<br>",
+  "<b>", "% Participación:   ",           "</b>",   as.character(capa_distritos$participacion*100), "%",     "<br>",
+    "<b>", "% PRIANRD :   ",           "</b>",   as.character(capa_distritos$pprianrd*100),  "%",    "<br>",
+  "<b>", "% MORENA:   ",           "</b>",   as.character(capa_distritos$pmorena*100),   "%",   "<br>")  %>% lapply(htmltools::HTML)
+
+
+
+
+mapadistritos <- leaflet(capa_distritos) %>%
+  addProviderTiles(providers$CartoDB.PositronNoLabels) %>%
+  addLayersControl(
+    baseGroups = c("% CAPTURA DE MUESTRA"),
+    options = layersControlOptions(collapsed = FALSE, position = "topleft")) %>%
+  addPolygons(data= capa_distritos,
+              stroke= TRUE,
+              weight=0.2,
+              opacity=1,
+              fillColor = ~incipal(capa_distritos$muestraclasf),
+              color= "white",
+              fillOpacity = 1,
+              smoothFactor = 0.5,
+              highlightOptions = highlightOptions(color = "black",
+                                                  weight = 1.2,
+                                                  bringToFront = TRUE),
+              label=popup,
+              labelOptions = labelOptions(noHide = F, direction = "top",
+                                          style = list(
+                                            "color" = "black",
+                                            "font-family" = "Lato",
+                                            "font-style" = "regular",
+                                            "box-shadow" = "2px 2px rgba(0,0,0,0.25)",
+                                            "font-size" = "11px",
+                                            "border-color" = "rgba(0,0,0,0.5)"
+                                          )),
+              group= "% CAPTURA DE MUESTRA") %>%
+  addLegend(position = "topleft", pal = incipal, values = ~niveles, opacity=1, group= "% CAPTURA DE MUESTRA",
+            labFormat = function(type, cuts, p) {
+              paste0(labs)} ,
+            title = NULL, na.label = "N/A")
+
+```
+
+```{r}
+renderLeaflet(mapadistritos)
+```
+
+Información por casilla
+=====================================
+
+```{r}
+CDSELECT <- cortemuestra %>% select(distrito_local,seccion_casilla, prianrd, morena, votos_nulos, votacion_total_emitida, lista_nominal)
+CDSELECT <- CDSELECT %>% mutate(prianrd = coalesce(prianrd,0L),morena = coalesce(morena,0L), votos_nulos = coalesce(votos_nulos,0L), votacion_total_emitida = coalesce(votacion_total_emitida, 0), lista_nominal = coalesce(lista_nominal, 0))
+
+reactable(CDSELECT, searchable = TRUE, highlight = TRUE, defaultSorted = "votacion_total_emitida", defaultSortOrder = "desc",
+  defaultPageSize = 20, minRows = 10, borderless = FALSE, striped = FALSE,
+    language = reactableLang(
+    searchPlaceholder = "Búsqueda...",
+    noData = "No encontrado",
+    pageInfo = "{rowStart} a {rowEnd} de {rows} entradas",
+    pagePrevious = "Previa",
+    pageNext = "Siguiente"),
+    theme = reactableTheme(
+      headerStyle = list(
+        "&:hover[aria-sort]" = list(background = "hsl(0, 0%, 96%)"),
+        "&[aria-sort='ascending'], &[aria-sort='descending']" = list(background = "hsl(0, 0%, 96%)"),
+        borderColor = "#555"
+      )
+    ),)
+```

@@ -195,31 +195,3 @@ renderPlot({
   labs(y= "% de votos", x= "Corte")
 })
 ```
-
-```{r}
-renderLeaflet(mapadistritos)
-```
-
-Información por casilla
-=====================================
-
-```{r}
-CDSELECT <- cortemuestra %>% select(distrito_local,seccion_casilla, prianrd, morena, votos_nulos, votacion_total_emitida, lista_nominal)
-CDSELECT <- CDSELECT %>% mutate(prianrd = coalesce(prianrd,0L),morena = coalesce(morena,0L), votos_nulos = coalesce(votos_nulos,0L), votacion_total_emitida = coalesce(votacion_total_emitida, 0), lista_nominal = coalesce(lista_nominal, 0))
-
-reactable(CDSELECT, searchable = TRUE, highlight = TRUE, defaultSorted = "votacion_total_emitida", defaultSortOrder = "desc",
-  defaultPageSize = 20, minRows = 10, borderless = FALSE, striped = FALSE,
-    language = reactableLang(
-    searchPlaceholder = "Búsqueda...",
-    noData = "No encontrado",
-    pageInfo = "{rowStart} a {rowEnd} de {rows} entradas",
-    pagePrevious = "Previa",
-    pageNext = "Siguiente"),
-    theme = reactableTheme(
-      headerStyle = list(
-        "&:hover[aria-sort]" = list(background = "hsl(0, 0%, 96%)"),
-        "&[aria-sort='ascending'], &[aria-sort='descending']" = list(background = "hsl(0, 0%, 96%)"),
-        borderColor = "#555"
-      )
-    ),)
-```
